@@ -1,0 +1,6 @@
+venv
+.idea
+__pycache__
+jimm/__pycache__/
+jimm/common/__pycache__/
+jimm/logs/__pycache__/
