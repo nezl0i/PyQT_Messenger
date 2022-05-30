@@ -11,11 +11,12 @@ from common.utils import get_message, send_message
 from common.variables import ACTION, PRESENCE, TIME, USER, ACCOUNT_NAME, \
     RESPONSE, ERROR, DEFAULT_IP_ADDRESS, DEFAULT_PORT, SENDER, MESSAGE, MESSAGE_TEXT, EXIT, DESTINATION
 from log_decorator import log
+from metacls import ClientVerifier
 
 CLIENT_LOGGER = logging.getLogger('client')
 
 
-class ClientSendOptions(threading.Thread):
+class ClientSendOptions(threading.Thread, metaclass=ClientVerifier):
     def __init__(self, account_name, sock):
         self.account_name = account_name
         self.sock = sock
@@ -137,6 +138,7 @@ def create_parser():
     return parser
 
 
+
 def main():
 
     args = create_parser().parse_args()
@@ -152,7 +154,6 @@ def main():
         transport.connect((server_address, server_port))
         send_message(transport, create_presence(client_name))
         answer = process_ans(get_message(transport))
-        print('[... Модуль клиента ...]')
         CLIENT_LOGGER.info(f'Установлено соединение с сервером. Ответ сервера: {answer}')
         print(f'Установлено соединение с сервером.')
     except (ConnectionRefusedError, ConnectionError):

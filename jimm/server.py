@@ -9,11 +9,15 @@ from common.variables import ACTION, ACCOUNT_NAME, RESPONSE, MAX_CONNECTIONS, \
     PRESENCE, TIME, USER, ERROR, DEFAULT_PORT, SENDER, MESSAGE, MESSAGE_TEXT, EXIT, RESPONSE_200, RESPONSE_400, \
     DESTINATION
 from common.utils import get_message, send_message
+from descriptors import Port
+from metacls import ServerVerifier
+
 
 SERVER_LOGGER = logging.getLogger('server')
 
 
-class Server:
+class Server(metaclass=ServerVerifier):
+    port = Port()
 
     def __init__(self, address, port):
         self.addr = address
@@ -23,7 +27,7 @@ class Server:
         self.messages = []
         self.names = dict()
 
-    def open_socket(self):
+    def create_socket(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((self.addr, self.port))
@@ -32,7 +36,7 @@ class Server:
         SERVER_LOGGER.info(f'Сервер запущен с параметрами: {self.addr}:{self.port}')
 
     def init(self):
-        self.open_socket()
+        self.create_socket()
 
         while True:
             try:
@@ -89,9 +93,8 @@ class Server:
                 self.names[message[USER][ACCOUNT_NAME]] = client
                 send_message(client, RESPONSE_200)
             else:
-                response = RESPONSE_400
-                response[ERROR] = 'Имя пользователя уже занято.'
-                send_message(client, response)
+                RESPONSE_400[ERROR] = 'Имя пользователя уже занято.'
+                send_message(client, RESPONSE_400)
                 self.clients.remove(client)
                 client.close()
             return
@@ -111,17 +114,9 @@ class Server:
             del self.names[ACCOUNT_NAME]
             return
         else:
-            response = RESPONSE_400
-            response[ERROR] = 'Запрос некорректен.'
-            send_message(client, response)
+            RESPONSE_400[ERROR] = 'Запрос некорректен.'
+            send_message(client, RESPONSE_400)
             return
-
-
-def check_port(port):
-    if port not in range(1024, 65536):
-        SERVER_LOGGER.critical(f'Ошибка запуска сервера с портом {port}. Допустимый диапазон портов от 1024 до 65535.')
-        sys.exit(1)
-    return port
 
 
 def main():
@@ -130,10 +125,7 @@ def main():
     parser.add_argument('-p', dest='port', nargs='?', default=DEFAULT_PORT, type=int, help='Server port')
     args = parser.parse_args()
 
-    listen_port = check_port(args.port)
-    listen_address = args.address
-
-    server = Server(listen_address, listen_port)
+    server = Server(args.address, args.port)
     server.init()
 
 
