@@ -1,9 +1,8 @@
-import json
-import sys
-import os
-sys.path.append(os.path.join(os.getcwd(), '..'))
 from common.variables import MAX_PACKAGE_LENGTH, ENCODING
 from log_decorator import log
+import json
+import sys
+sys.path.append('../')
 
 
 @log
@@ -23,7 +22,6 @@ def get_message(client):
 
 @log
 def send_message(sock, message):
-
     if not isinstance(message, dict):
         raise TypeError
     js_message = json.dumps(message)
