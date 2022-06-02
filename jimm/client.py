@@ -12,7 +12,7 @@ from common.variables import ACTION, PRESENCE, TIME, USER, ACCOUNT_NAME, \
     RESPONSE, ERROR, DEFAULT_IP_ADDRESS, DEFAULT_PORT, SENDER, MESSAGE, MESSAGE_TEXT, EXIT, DESTINATION
 from log_decorator import log
 from metacls import ClientVerifier
-
+from common.helper import client_help
 CLIENT_LOGGER = logging.getLogger('client')
 
 
@@ -48,13 +48,13 @@ class ClientSendOptions(threading.Thread, metaclass=ClientVerifier):
             sys.exit(1)
 
     def run(self):
-        helper()
+        client_help()
         while True:
             command = input('Введите команду: ')
             if command == 'message':
                 self.create_message()
             elif command == 'help':
-                helper()
+                client_help()
             elif command == 'exit':
                 send_message(self.sock, self.create_exit_message())
                 print('Завершение соединения.')
@@ -92,16 +92,7 @@ class ClientReadOptions(threading.Thread):
                 break
 
 
-def helper():
-    """Справка по командам"""
-    print('Поддерживаемые команды:')
-    print('message - сформировать сообщение для отправки')
-    print('help - подсказки по командам')
-    print('exit - выход')
-
-
 def check_port(port):
-    """Проверка порта сокета для клиента"""
     if port not in range(1024, 65536):
         CLIENT_LOGGER.critical(f'Ошибка запуска с портом {port}. Допустимый диапазон портов от 1024 до 65535.')
         sys.exit(1)
@@ -136,7 +127,6 @@ def create_parser():
     parser.add_argument('-p', '--port',  nargs='?', default=DEFAULT_PORT, type=int, help='Server port')
     parser.add_argument('-n', '--name', default='None', nargs='?')
     return parser
-
 
 
 def main():
