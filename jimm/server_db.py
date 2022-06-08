@@ -27,8 +27,22 @@ class ServerDatabase:
             self.ip = ip
             self.port = port
 
-    def __init__(self):
-        self.database_engine = create_engine(SERVER_DB, echo=False, pool_recycle=7200)
+    class UsersContacts:
+        def __init__(self, user, contact):
+            self.id = None
+            self.user = user
+            self.contact = contact
+
+    class UsersHistory:
+        def __init__(self, user):
+            self.id = None
+            self.user = user
+            self.sent = 0
+            self.accepted = 0
+
+    def __init__(self, path):
+        self.database_engine = create_engine(f'sqlite:///{path}', echo=False, pool_recycle=7200,
+                                             connect_args={'check_same_thread': False})
         self.metadata = MetaData()
 
         users_table = Table('Users', self.metadata,
@@ -53,11 +67,26 @@ class ServerDatabase:
                                    Column('port', String)
                                    )
 
+        contacts = Table('Contacts', self.metadata,
+                         Column('id', Integer, primary_key=True),
+                         Column('user', ForeignKey('Users.id')),
+                         Column('contact', ForeignKey('Users.id'))
+                         )
+
+        users_history_table = Table('History', self.metadata,
+                                    Column('id', Integer, primary_key=True),
+                                    Column('user', ForeignKey('Users.id')),
+                                    Column('sent', Integer),
+                                    Column('accepted', Integer)
+                                    )
+
         self.metadata.create_all(self.database_engine)
 
         mapper(self.Users, users_table)
         mapper(self.ActiveUsers, active_users_table)
         mapper(self.LoginHistory, user_login_history)
+        mapper(self.UsersContacts, contacts)
+        mapper(self.UsersHistory, users_history_table)
 
         Session = sessionmaker(bind=self.database_engine)
         self.session = Session()
@@ -66,7 +95,7 @@ class ServerDatabase:
         self.session.commit()
 
     def user_login(self, username, ip_address, port):
-        print(username, ip_address, port)
+        # print(username, ip_address, port)
         rez = self.session.query(self.Users).filter_by(name=username)
 
         if rez.count():
@@ -76,6 +105,8 @@ class ServerDatabase:
             user = self.Users(username)
             self.session.add(user)
             self.session.commit()
+            user_in_history = self.UsersHistory(user.id)
+            self.session.add(user_in_history)
 
         new_active_user = self.ActiveUsers(user.id, ip_address, port, datetime.datetime.now())
         self.session.add(new_active_user)
@@ -87,6 +118,40 @@ class ServerDatabase:
     def user_logout(self, username):
         user = self.session.query(self.Users).filter_by(name=username).first()
         self.session.query(self.ActiveUsers).filter_by(user=user.id).delete()
+        self.session.commit()
+
+    def process_message(self, sender, recipient):
+        sender = self.session.query(self.Users).filter_by(name=sender).first().id
+        recipient = self.session.query(self.Users).filter_by(name=recipient).first().id
+        sender_row = self.session.query(self.UsersHistory).filter_by(user=sender).first()
+        sender_row.sent += 1
+        recipient_row = self.session.query(self.UsersHistory).filter_by(user=recipient).first()
+        recipient_row.accepted += 1
+
+        self.session.commit()
+
+    def add_contact(self, user, contact):
+        user = self.session.query(self.Users).filter_by(name=user).first()
+        contact = self.session.query(self.Users).filter_by(name=contact).first()
+
+        if not contact or self.session.query(self.UsersContacts).filter_by(user=user.id, contact=contact.id).count():
+            return
+
+        contact_row = self.UsersContacts(user.id, contact.id)
+        self.session.add(contact_row)
+        self.session.commit()
+
+    def remove_contact(self, user, contact):
+        user = self.session.query(self.Users).filter_by(name=user).first()
+        contact = self.session.query(self.Users).filter_by(name=contact).first()
+
+        if not contact:
+            return
+
+        self.session.query(self.UsersContacts).filter(
+            self.UsersContacts.user == user.id,
+            self.UsersContacts.contact == contact.id
+        ).delete()
         self.session.commit()
 
     def users_list(self):
@@ -115,21 +180,35 @@ class ServerDatabase:
             query = query.filter(self.Users.name == username)
         return query.all()
 
+    def get_contacts(self, username):
+        user = self.session.query(self.Users).filter_by(name=username).one()
+
+        query = self.session.query(self.UsersContacts, self.Users.name). \
+            filter_by(user=user.id). \
+            join(self.Users, self.UsersContacts.contact == self.Users.id)
+
+        return [contact[1] for contact in query.all()]
+
+    def message_history(self):
+        query = self.session.query(
+            self.Users.name,
+            self.Users.last_login,
+            self.UsersHistory.sent,
+            self.UsersHistory.accepted
+        ).join(self.Users)
+        return query.all()
+
 
 if __name__ == '__main__':
     test_db = ServerDatabase()
     test_db.user_login('client_1', '192.168.1.4', 8080)
     test_db.user_login('client_2', '192.168.1.5', 7777)
 
-    print(' ---- test_db.active_users_list() ----')
     print(test_db.active_users_list())
+    test_db.process_message('client_1', 'client_2')
+    print(test_db.message_history())
 
-    test_db.user_logout('client_1')
-    print(' ---- test_db.active_users_list() after logout client_1 ----')
-    print(test_db.active_users_list())
-
-    print(' ---- test_db.login_history(client_1) ----')
-    print(test_db.login_history('client_1'))
-
-    print(' ---- test_db.users_list() ----')
-    print(test_db.users_list())
+    # test_db.user_logout('client_1')
+    # print(test_db.active_users_list())
+    # print(test_db.login_history('client_1'))
+    # print(test_db.users_list())
