@@ -37,6 +37,7 @@ if __name__ == '__main__':
     client_name = args.name
 
     client_app = QApplication(sys.argv)
+    transport = None
 
     if not client_name:
         print(client_name)
@@ -56,7 +57,8 @@ if __name__ == '__main__':
     except ServerError as error:
         print(error.text)
         exit(1)
-    transport.setDaemon(True)
+    transport.daemon = True
+
     transport.start()
 
     main_window = ClientMainWindow(database, transport)
