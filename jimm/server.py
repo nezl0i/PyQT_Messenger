@@ -279,7 +279,7 @@ def main():
             if 1023 < port < 65536:
                 config['SETTINGS']['Default_port'] = str(port)
                 dir_path = os.path.dirname(os.path.realpath(__file__))
-                with open(f"{dir_path}/{'server_dist.ini'}", 'w') as conf:
+                with open(f"{dir_path}/{'server.ini'}", 'w') as conf:
                     config.write(conf)
                     message.information(config_window, 'OK', 'Настройки успешно сохранены!')
             else:
