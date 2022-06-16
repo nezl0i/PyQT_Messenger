@@ -8,6 +8,12 @@ import logs.client_log_config
 
 
 def log(func):
+    """
+    Декоратор, выполняющий логирование вызовов функций.
+    Сохраняет события типа debug, содержащие
+    информацию об имени вызываемой функции, параметры с которыми
+    вызывается функция, и модуль, вызывающий функцию.
+    """
     def wrapper(*args, **kwargs):
         logger_name = 'server' if 'server.py' in sys.argv[0] else 'client'
         LOGGER = logging.getLogger(logger_name)
@@ -21,6 +27,14 @@ def log(func):
 
 
 def login_required(func):
+    """
+    Декоратор, проверяющий, что клиент авторизован на сервере.
+    Проверяет, что передаваемый объект сокета находится в
+    списке авторизованных клиентов.
+    За исключением передачи словаря-запроса
+    на авторизацию. Если клиент не авторизован,
+    генерирует исключение TypeError
+    """
     def checker(*args, **kwargs):
         from server_app.core import MessageProcessor
         from common.variables import ACTION, PRESENCE

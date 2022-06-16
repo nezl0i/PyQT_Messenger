@@ -4,6 +4,10 @@ from PyQt5.QtCore import Qt
 
 
 class DelContactDialog(QDialog):
+    """
+    Диалог удаления контакта. Предлагает текущий список контактов,
+    не имеет обработчиков для действий.
+    """
     def __init__(self, database):
         super().__init__()
         self.database = database
@@ -20,6 +24,7 @@ class DelContactDialog(QDialog):
         self.selector = QComboBox(self)
         self.selector.setFixedSize(200, 30)
         self.selector.move(10, 30)
+        # заполнитель контактов для удаления
         self.selector.addItems(sorted(self.database.get_contacts()))
 
         self.btn_ok = QPushButton('Удалить', self)
