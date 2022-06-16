@@ -1,7 +1,3 @@
-import configparser
-import os
-import select
-import sys
 import os
 import argparse
 import logging
@@ -17,6 +13,7 @@ from server_app.main_window import MainWindow
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
 
+# Инициализация логирования сервера.
 SERVER_LOGGER = logging.getLogger('server')
 
 if sys.platform == 'linux':
@@ -25,6 +22,7 @@ if sys.platform == 'linux':
 
 @log
 def arg_parser(default_port, default_address):
+    """Парсер аргументов командной строки."""
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', default=default_port, type=int, nargs='?')
     parser.add_argument('-a', default=default_address, nargs='?')
@@ -35,11 +33,15 @@ def arg_parser(default_port, default_address):
     gui_flag = namespace.no_gui
     return listen_address, listen_port, gui_flag
 
+
 @log
 def config_load():
+    """Парсер конфигурационного ini файла."""
     config = configparser.ConfigParser()
     dir_path = os.path.dirname(os.path.realpath(__file__))
     config.read(f"{dir_path}/{'server.ini'}")
+    # Если конфиг файл загружен правильно, запускаемся, иначе конфиг по
+    # умолчанию.
     if 'SETTINGS' in config:
         return config
     else:
@@ -50,20 +52,25 @@ def config_load():
         config.set('SETTINGS', 'Database_file', 'server_db.db3')
         return config
 
+
 @log
 def main():
+    """Основная функция"""
+    # Загрузка файла конфигурации сервера
     config = config_load()
-
+    # Загрузка параметров командной строки, если нет параметров, то задаём
+    # значения по умолчанию.
     listen_address, listen_port, gui_flag = arg_parser(config['SETTINGS']['Default_port'],
                                                        config['SETTINGS']['Listen_Address'])
-
+    # Инициализация базы данных
     database = ServerDatabase(os.path.join(config['SETTINGS']['Database_path'],
                                            config['SETTINGS']['Database_file']))
-
+    # Создание экземпляра класса - сервера и его запуск:
     server = MessageProcessor(listen_address, listen_port, database)
     server.daemon = True
     server.start()
-
+    # Если указан параметр без GUI, то запускаем простенький обработчик
+    # консольного ввода
     if gui_flag:
         while True:
             command = input('Введите exit для завершения работы сервера.')
@@ -71,11 +78,15 @@ def main():
                 server.running = False
                 server.join()
                 break
+    # Если не указан запуск без GUI, то запускаем GUI:
     else:
+        # Создаём графическое окружение для сервера:
         server_app = QApplication(sys.argv)
         server_app.setAttribute(Qt.AA_DisableWindowContextHelpButton)
         main_window = MainWindow(database, server, config)
+        # Запускаем GUI
         server_app.exec_()
+        # По закрытию окон останавливаем обработчик сообщений
         server.running = False
 
 

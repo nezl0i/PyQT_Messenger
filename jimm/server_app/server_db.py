@@ -4,7 +4,13 @@ import datetime
 
 
 class ServerDatabase:
+    """
+    Класс - оболочка для работы с базой данных сервера.
+    Использует SQLite базу данных, реализован с помощью
+    SQLAlchemy ORM и используется классический подход.
+    """
     class AllUsers:
+        """Класс - отображение таблицы всех пользователей."""
         def __init__(self, username, passwd_hash):
             self.name = username
             self.last_login = datetime.datetime.now()
@@ -13,6 +19,7 @@ class ServerDatabase:
             self.id = None
 
     class ActiveUsers:
+        """Класс - отображение таблицы активных пользователей."""
         def __init__(self, user_id, ip_address, port, login_time):
             self.user = user_id
             self.ip_address = ip_address
@@ -21,6 +28,7 @@ class ServerDatabase:
             self.id = None
 
     class LoginHistory:
+        """Класс - отображение таблицы истории входов."""
         def __init__(self, name, date, ip, port):
             self.id = None
             self.name = name
@@ -29,12 +37,14 @@ class ServerDatabase:
             self.port = port
 
     class UsersContacts:
+        """Класс - отображение таблицы контактов пользователей."""
         def __init__(self, user, contact):
             self.id = None
             self.user = user
             self.contact = contact
 
     class UsersHistory:
+        """Класс - отображение таблицы истории действий."""
         def __init__(self, user):
             self.id = None
             self.user = user
@@ -51,6 +61,7 @@ class ServerDatabase:
 
         self.metadata = MetaData()
 
+        # Создаём таблицу пользователей
         users_table = Table('Users', self.metadata,
                             Column('id', Integer, primary_key=True),
                             Column('name', String, unique=True),
@@ -59,6 +70,7 @@ class ServerDatabase:
                             Column('pubkey', Text)
                             )
 
+        # Создаём таблицу активных пользователей
         active_users_table = Table('Active_users', self.metadata,
                                    Column('id', Integer, primary_key=True),
                                    Column('user', ForeignKey('Users.id'), unique=True),
@@ -67,6 +79,7 @@ class ServerDatabase:
                                    Column('login_time', DateTime)
                                    )
 
+        # Создаём таблицу истории входов
         user_login_history = Table('Login_history', self.metadata,
                                    Column('id', Integer, primary_key=True),
                                    Column('name', ForeignKey('Users.id')),
@@ -75,12 +88,14 @@ class ServerDatabase:
                                    Column('port', String)
                                    )
 
+        # Создаём таблицу контактов пользователей
         contacts = Table('Contacts', self.metadata,
                          Column('id', Integer, primary_key=True),
                          Column('user', ForeignKey('Users.id')),
                          Column('contact', ForeignKey('Users.id'))
                          )
 
+        # Создаём таблицу статистики пользователей
         users_history_table = Table('History', self.metadata,
                                     Column('id', Integer, primary_key=True),
                                     Column('user', ForeignKey('Users.id')),
@@ -99,10 +114,16 @@ class ServerDatabase:
         Session = sessionmaker(bind=self.database_engine)
         self.session = Session()
 
+        # Если в таблице активных пользователей есть записи, то их необходимо
+        # удалить
         self.session.query(self.ActiveUsers).delete()
         self.session.commit()
 
     def user_login(self, username, ip_address, port, key):
+        """
+        Метод выполняющийся при входе пользователя, записывает в базу факт входа.
+        Обновляет открытый ключ пользователя при его изменении.
+        """
         rez = self.session.query(self.AllUsers).filter_by(name=username)
         if rez.count():
             user = rez.first()
@@ -121,6 +142,10 @@ class ServerDatabase:
         self.session.commit()
 
     def add_user(self, name, passwd_hash):
+        """
+        Метод регистрации пользователя.
+        Принимает имя и хэш пароля, создаёт запись в таблице статистики.
+        """
         user_row = self.AllUsers(name, passwd_hash)
         self.session.add(user_row)
         self.session.commit()
@@ -129,6 +154,7 @@ class ServerDatabase:
         self.session.commit()
 
     def remove_user(self, name):
+        """Метод удаляющий пользователя из базы."""
         user = self.session.query(self.AllUsers).filter_by(name=name).first()
         self.session.query(self.ActiveUsers).filter_by(user=user.id).delete()
         self.session.query(self.LoginHistory).filter_by(name=user.id).delete()
@@ -141,20 +167,24 @@ class ServerDatabase:
         self.session.commit()
 
     def get_hash(self, name):
+        """Метод получения хэша пароля пользователя."""
         user = self.session.query(self.AllUsers).filter_by(name=name).first()
         return user.passwd_hash
 
     def get_pubkey(self, name):
+        """Метод получения публичного ключа пользователя."""
         user = self.session.query(self.AllUsers).filter_by(name=name).first()
         return user.pubkey
 
     def check_user(self, name):
+        """Метод проверяющий существование пользователя."""
         if self.session.query(self.AllUsers).filter_by(name=name).count():
             return True
         else:
             return False
 
     def user_logout(self, username):
+        """Метод фиксирующий отключения пользователя."""
         user = self.session.query(
             self.AllUsers).filter_by(
             name=username).first()
@@ -163,6 +193,7 @@ class ServerDatabase:
         self.session.commit()
 
     def process_message(self, sender, recipient):
+        """Метод записывающий в таблицу статистики факт передачи сообщения."""
         sender = self.session.query(
             self.AllUsers).filter_by(
             name=sender).first().id
@@ -181,6 +212,7 @@ class ServerDatabase:
         self.session.commit()
 
     def add_contact(self, user, contact):
+        """Метод добавления контакта для пользователя."""
         user = self.session.query(self.AllUsers).filter_by(name=user).first()
         contact = self.session.query(
             self.AllUsers).filter_by(
@@ -196,6 +228,7 @@ class ServerDatabase:
         self.session.commit()
 
     def remove_contact(self, user, contact):
+        """Метод удаления контакта пользователя."""
         user = self.session.query(self.AllUsers).filter_by(name=user).first()
         contact = self.session.query(
             self.AllUsers).filter_by(
@@ -210,6 +243,7 @@ class ServerDatabase:
         self.session.commit()
 
     def users_list(self):
+        """Метод возвращающий список известных пользователей со временем последнего входа."""
         query = self.session.query(
             self.AllUsers.name,
             self.AllUsers.last_login
@@ -217,6 +251,7 @@ class ServerDatabase:
         return query.all()
 
     def active_users_list(self):
+        """Метод возвращающий список активных пользователей."""
         query = self.session.query(
             self.AllUsers.name,
             self.ActiveUsers.ip_address,
@@ -226,6 +261,7 @@ class ServerDatabase:
         return query.all()
 
     def login_history(self, username=None):
+        """Метод возвращающий историю входов."""
         query = self.session.query(
             self.AllUsers.name,
             self.LoginHistory.date_time,
@@ -237,6 +273,7 @@ class ServerDatabase:
         return query.all()
 
     def get_contacts(self, username):
+        """Метод возвращающий список контактов пользователя."""
         user = self.session.query(self.AllUsers).filter_by(name=username).one()
         query = self.session.query(self.UsersContacts, self.AllUsers.name). \
             filter_by(user=user.id). \
@@ -244,6 +281,7 @@ class ServerDatabase:
         return [contact[1] for contact in query.all()]
 
     def message_history(self):
+        """Метод возвращающий статистику сообщений."""
         query = self.session.query(
             self.AllUsers.name,
             self.AllUsers.last_login,

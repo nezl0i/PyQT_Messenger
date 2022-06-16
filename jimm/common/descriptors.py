@@ -1,8 +1,14 @@
 import logging
+
 SERVER_LOGGER = logging.getLogger('server')
 
 
 class Port:
+    """
+    Класс - дескриптор для номера порта.
+    Позволяет использовать только порты с 1023 по 65536.
+    При попытке установить неподходящий номер порта генерирует исключение.
+    """
     def __set__(self, instance, value):
         if value not in range(1024, 65536):
             SERVER_LOGGER.critical(
